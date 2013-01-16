@@ -6,7 +6,7 @@ python:
   - "3.2"
   - "pypy"
 install:
-  - "if [[ $TRAVIS_PYTHON_VERSION == '2.6' ]]; then pip install --use-mirrors pysam argparse ordereddict; fi"
-  - "if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then pip install --use-mirrors pysam; fi"
+  - "if [[ $TRAVIS_PYTHON_VERSION == '2.6' ]]; then pip install --use-mirrors cython pysam argparse ordereddict; fi"
+  - "if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then pip install --use-mirrors cython pysam; fi"
   - python setup.py install
 script: python setup.py test
