@@ -113,6 +113,42 @@ class _Call(object):
         return self.gt_type == 1
 
 
+class _CallStats(object):
+    def __init__(self, record):
+        self.record = record
+
+    def _aggregate_stats(self):
+        self.num_samples = 0
+        self.num_called = 0
+        self.call_rate = 0
+        self.num_hom_ref = 0
+        self.num_het = 0
+        self.num_hom_alt = 0
+        self.num_unknown = 0
+
+        for sample in self.record.samples:
+            self.num_samples += 1
+            if sample.called:
+                self.num_called += 1
+            gt_type = sample.gt_type
+            if gt_type == 0:
+                self.num_hom_ref += 1
+            elif gt_type == 1:
+                self.num_het += 1
+            elif gt_type == 2:
+                self.num_hom_alt += 1
+            else:
+                self.num_unknown += 1
+
+        self.call_rate = float(self.num_called) / float(self.num_samples)
+
+    def __getattr__(self, name):
+        if name not in ('num_samples', 'num_called', 'call_rate', 'num_hom_ref', 'num_het', 'num_hom_alt', 'num_unknown'):
+            raise AttributeError
+        self._aggregate_stats()
+        return getattr(self, name)
+
+
 class _Record(object):
     """ A set of calls at a site.  Equivalent to a row in a VCF file.
 
@@ -142,6 +178,7 @@ class _Record(object):
         #: list of ``_Calls`` for each sample ordered as in source VCF
         self.samples = samples or []
         self._sample_indexes = sample_indexes
+        self._call_stats = _CallStats(self)
 
     def __eq__(self, other):
         """ _Records are equal if they describe the same variant (same position, alleles) """
@@ -178,32 +215,32 @@ class _Record(object):
     @property
     def num_called(self):
         """ The number of called samples"""
-        return sum(s.called for s in self.samples)
+        return self._call_stats.num_called
 
     @property
     def call_rate(self):
         """ The fraction of genotypes that were actually called. """
-        return float(self.num_called) / float(len(self.samples))
+        return self._call_stats.call_rate
 
     @property
     def num_hom_ref(self):
         """ The number of homozygous for ref allele genotypes"""
-        return len([s for s in self.samples if s.gt_type == 0])
+        return self._call_stats.num_hom_ref
 
     @property
     def num_hom_alt(self):
         """ The number of homozygous for alt allele genotypes"""
-        return len([s for s in self.samples if s.gt_type == 2])
+        return self._call_stats.num_hom_alt
 
     @property
     def num_het(self):
         """ The number of heterozygous genotypes"""
-        return len([s for s in self.samples if s.gt_type == 1])
+        return self._call_stats.num_het
 
     @property
     def num_unknown(self):
         """ The number of unknown genotypes"""
-        return len([s for s in self.samples if s.gt_type is None])
+        return self._call_stats.num_unknown
 
     @property
     def aaf(self):
