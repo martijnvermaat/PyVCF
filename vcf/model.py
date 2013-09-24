@@ -270,78 +270,74 @@ class _Record(object):
     @property
     def is_indel(self):
         """ Return whether or not the variant is an INDEL """
-        is_sv = self.is_sv
+        # The difference between INDELs and SVs can be murky:
+        # 1	2827693	.	CCCCTCGCA	C	.	PASS	AC=10;
+        # 1	2827693	.	CCCCTCGCA	C	.	PASS	SVTYPE=DEL;
+        if self.is_sv:
+            return False
 
-        if len(self.REF) > 1 and not is_sv:
+        if len(self.REF) > 1:
             return True
+
         for alt in self.ALT:
             if alt is None:
-                return True
+                return False
             if alt.type != "SNV" and alt.type != "MNV":
                 return False
-            elif len(alt) != len(self.REF):
-                # the diff. b/w INDELs and SVs can be murky.
-                if not is_sv:
-                    # 1	2827693	.	CCCCTCGCA	C	.	PASS	AC=10;
-                    return True
-                else:
-                    # 1	2827693	.	CCCCTCGCA	C	.	PASS	SVTYPE=DEL;
-                    return False
-        return False
+            if len(self.REF) == 1 and alt.type == "SNV":
+                return False
+        return True
 
     @property
     def is_sv(self):
         """ Return whether or not the variant is a structural variant """
-        if self.INFO.get('SVTYPE') is None:
-            return False
-        return True
+        return self.INFO.get('SVTYPE') is not None
 
     @property
     def is_transition(self):
         """ Return whether or not the SNP is a transition """
-        # if multiple alts, it is unclear if we have a transition
-        if len(self.ALT) > 1:
+        # If multiple alts, it is unclear if we have a transition.
+        if not self.is_snp or len(self.ALT) > 1:
             return False
 
-        if self.is_snp:
-            # just one alt allele
-            alt_allele = self.ALT[0]
-            if ((self.REF == "A" and alt_allele == "G") or
+        # Just one alt allele.
+        alt_allele = self.ALT[0]
+        return ((self.REF == "A" and alt_allele == "G") or
                 (self.REF == "G" and alt_allele == "A") or
                 (self.REF == "C" and alt_allele == "T") or
-                (self.REF == "T" and alt_allele == "C")):
-                return True
-            else:
-                return False
-        else:
+                (self.REF == "T" and alt_allele == "C"))
+
+    @property
+    def is_transversion(self):
+        """ Return whether or not the SNP is a transversion """
+        if not self.is_snp or len(self.ALT) > 1:
             return False
+        return not self.is_transition
 
     @property
     def is_deletion(self):
         """ Return whether or not the INDEL is a deletion """
-        # if multiple alts, it is unclear if we have a transition
-        if len(self.ALT) > 1:
+        if not self.is_indel:
             return False
+        return all(len(self.REF) > 1 and self.REF[:-1].startswith(str(alt))
+                   for alt in self.ALT)
 
-        if self.is_indel:
-            # just one alt allele
-            alt_allele = self.ALT[0]
-            if alt_allele is None:
-                return True
-            if len(self.REF) > len(alt_allele):
-                return True
-            else:
-                return False
-        else:
+    @property
+    def is_insertion(self):
+        """ Return whether or not the INDEL is an insertion """
+        if not self.is_indel:
             return False
+        return all(len(alt) > 1 and str(alt)[:-1].startswith(self.REF)
+                   for alt in self.ALT)
 
     @property
     def var_type(self):
         """
-        Return the type of variant [snp, indel, unknown]
-        TO DO: support SVs
+        Return the type of variant [ref, snp, indel, sv, unknown]
         """
-        if self.is_snp:
+        if self.is_monomorphic:
+            return "ref"
+        elif self.is_snp:
             return "snp"
         elif self.is_indel:
             return "indel"
@@ -374,17 +370,19 @@ class _Record(object):
         detail below. Imprecise variants should also be marked by the presence
         of an IMPRECISE flag in the INFO field."
         """
-        if self.is_snp:
+        if self.is_monomorphic:
+            return "unknown"
+        elif self.is_snp:
             if self.is_transition:
                 return "ts"
-            elif len(self.ALT) == 1:
+            elif self.is_transversion:
                 return "tv"
             else:  # multiple ALT alleles.  unclear
                 return "unknown"
         elif self.is_indel:
             if self.is_deletion:
                 return "del"
-            elif len(self.ALT) == 1:
+            elif self.is_insertion:
                 return "ins"
             else:  # multiple ALT alleles.  unclear
                 return "unknown"

@@ -433,6 +433,21 @@ class TestRecord(unittest.TestCase):
             elif var.POS == 1234567:
                 self.assertEqual(None, pi)
 
+    def test_is_monomorphic(self):
+        reader = vcf.Reader(fh('example-4.0.vcf'))
+        for var in reader:
+            is_mono = var.is_monomorphic
+            if var.POS == 14370:
+                self.assertEqual(False, is_mono)
+            if var.POS == 17330:
+                self.assertEqual(False, is_mono)
+            if var.POS == 1110696:
+                self.assertEqual(False, is_mono)
+            if var.POS == 1230237:
+                self.assertEqual(True, is_mono)
+            elif var.POS == 1234567:
+                self.assertEqual(False, is_mono)
+
     def test_is_snp(self):
         reader = vcf.Reader(fh('example-4.0.vcf'))
         for r in reader:
@@ -464,9 +479,20 @@ class TestRecord(unittest.TestCase):
             if var.POS == 1110696:
                 self.assertEqual(False, is_indel)
             if var.POS == 1230237:
-                self.assertEqual(True, is_indel)
+                self.assertEqual(False, is_indel)
             elif var.POS == 1234567:
                 self.assertEqual(True, is_indel)
+
+    def test_ref_is_indel(self):
+        """
+        A non-variant site should not be reported as indel.
+        """
+        reader = vcf.Reader(fh('mixed-filtering.vcf'))
+        self.assertEqual(next(reader).is_indel, False)
+        self.assertEqual(next(reader).is_indel, False)
+        self.assertEqual(next(reader).is_indel, False)
+        self.assertEqual(next(reader).is_indel, False)
+        self.assertEqual(next(reader).is_indel, True)
 
     def test_is_transition(self):
         reader = vcf.Reader(fh('example-4.0.vcf'))
@@ -494,9 +520,44 @@ class TestRecord(unittest.TestCase):
             if var.POS == 1110696:
                 self.assertEqual(False, is_del)
             if var.POS == 1230237:
-                self.assertEqual(True, is_del)
+                self.assertEqual(False, is_del)
             elif var.POS == 1234567:
                 self.assertEqual(False, is_del)
+
+        # Also test on a file with an actual deletion.
+        reader = vcf.Reader(fh('1kg.sites.vcf'))
+        for var in reader:
+            is_del = var.is_deletion
+            if var.POS == 13327:
+                self.assertEqual(False, is_del)
+            if var.POS == 13957:
+                self.assertEqual(True, is_del)
+
+    def test_is_insertion(self):
+        reader = vcf.Reader(fh('example-4.0.vcf'))
+        for var in reader:
+            is_ins = var.is_insertion
+            if var.POS == 14370:
+                self.assertEqual(False, is_ins)
+            if var.POS == 17330:
+                self.assertEqual(False, is_ins)
+            if var.POS == 1110696:
+                self.assertEqual(False, is_ins)
+            if var.POS == 1230237:
+                self.assertEqual(False, is_ins)
+            elif var.POS == 1234567:
+                self.assertEqual(False, is_ins)
+
+        # Also test on a file with an actual insertion.
+        reader = vcf.Reader(fh('1kg.sites.vcf'))
+        for var in reader:
+            is_ins = var.is_insertion
+            if var.POS == 30923:
+                self.assertEqual(False, is_ins)
+            if var.POS == 46402:
+                self.assertEqual(True, is_ins)
+            if var.POS == 47190:
+                self.assertEqual(True, is_ins)
 
     def test_var_type(self):
         reader = vcf.Reader(fh('example-4.0.vcf'))
@@ -509,9 +570,19 @@ class TestRecord(unittest.TestCase):
             if var.POS == 1110696:
                 self.assertEqual("snp", type)
             if var.POS == 1230237:
-                self.assertEqual("indel", type)
+                self.assertEqual("ref", type)
             elif var.POS == 1234567:
                 self.assertEqual("indel", type)
+
+        # Also test on a file with a deletion.
+        reader = vcf.Reader(fh('1kg.sites.vcf'))
+        for var in reader:
+            type = var.var_type
+            if var.POS == 13327:
+                self.assertEqual("snp", type)
+            if var.POS == 13957:
+                self.assertEqual("indel", type)
+
         # SV tests
         reader = vcf.Reader(fh('example-4.1-sv.vcf'))
         for var in reader:
@@ -541,9 +612,19 @@ class TestRecord(unittest.TestCase):
             if var.POS == 1110696:
                 self.assertEqual("unknown", subtype)
             if var.POS == 1230237:
-                self.assertEqual("del", subtype)
+                self.assertEqual("unknown", subtype)
             elif var.POS == 1234567:
                 self.assertEqual("unknown", subtype)
+
+        # Also test on a file with a deletion.
+        reader = vcf.Reader(fh('1kg.sites.vcf'))
+        for var in reader:
+            subtype = var.var_subtype
+            if var.POS == 13327:
+                self.assertEqual("tv", subtype)
+            if var.POS == 13957:
+                self.assertEqual("del", subtype)
+
         # SV tests
         reader = vcf.Reader(fh('example-4.1-sv.vcf'))
         for var in reader:
